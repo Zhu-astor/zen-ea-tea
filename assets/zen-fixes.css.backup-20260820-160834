@@ -1,0 +1,432 @@
+﻿/* Normalizes brand-asset image ratios in the sliders (feature / recipe / story / highlight).
+   Root cause: the replacement 蟬吃茶 images have wildly different native dimensions
+   (e.g. 800x800 vs 1462x4376), and Ippodo's original CSS never constrained slide <img>
+   size because its own source images were already uniform. Without this, browsers fall
+   back to the default object-fit:fill / natural aspect ratio, producing slides of very
+   different heights within the same row and breaking vertical alignment. */
+
+.o-feature-list__item img.a-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  object-position: center;
+}
+
+.p-top-recipe__item img.p-top-recipe__image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  object-position: center;
+}
+
+.p-top-iroiro__item > a > img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* .p-top-recipe__list / .p-top-iroiro__list double as the Swiper "swiper-wrapper" AND
+   carry a no-JS CSS-grid fallback from main--global.css:
+   display:grid;grid-template-columns:1fr 1fr 1fr;max-width:940px;margin:0 auto
+   (a 3-column grid so the cards still look fine if JS/Swiper fails to load). On the
+   real Ippodo site, bundle.js's native Swiper init neutralizes this fallback once it
+   takes over. Our manual CDN Swiper reinit (index.html, window.load handler) never
+   does — it only adds Swiper's own behavior/classes on top, so the grid's
+   max-width:940px stays in effect and CAPS the wrapper's width well below the
+   container's actual 1392px, with margin:0 auto then centering that undersized box —
+   net effect: confirmed via getBoundingClientRect, slide 1 starts 206px further right
+   than it should, and slide 3 gets pushed 226px+ past the container's right edge,
+   clipped invisible by the container's overflow:hidden ("card 1.5 off-screen"). Forcing
+   flex/no-max-width/no-auto-margin here lets Swiper's own width:100% (from the CDN
+   swiper-bundle.css) take over instead. */
+.p-top-recipe__list.swiper-wrapper,
+.p-top-iroiro__list.swiper-wrapper {
+  display: flex !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+/* .p-top-highlight__item images are NOT overridden here: main--global.css already
+   handles them correctly via .m-product-card__image{padding-top:124%} (a padding-box
+   aspect-ratio) + .m-product-card__image img{position:absolute;inset:0;width:100%;
+   height:100%;object-fit:cover} — a properly built, shape-agnostic solution from
+   Ippodo's own theme. An earlier version of this file added an aspect-ratio:1/1 +
+   object-fit:contain override here; object-fit was the only property it actually won
+   (higher specificity), while position/width/height still came from the original rule
+   (untouched, so aspect-ratio had no effect — the box was already sized by the padding
+   trick) — net effect was swapping a working cover-crop for a contain-letterbox, which
+   made the one extreme-aspect-ratio source image (1462x4376) render as a thin sliver
+   with dead space instead of filling its card like its siblings. Removed. */
+
+/* Hero: confirmed against the pristine Ippodo clone that .p-top-hero__item--main is
+   normally filled with a wide illustrated scene. The originally-selected replacement
+   (m240130.jpg) was a 812x1426 PORTRAIT poster graphic — bundle.js's scroll handler sets
+   background-size to a raw "100+scroll%" (width-fill, height-auto), which on a portrait
+   source inflates the rendered image to ~4x the container height, so only its top sliver
+   (blank margin in that particular graphic) was visible: the hero rendered as an empty
+   white box. Fixed in two parts: index.html now points the hero at hero-banner.jpg (the
+   correctly-proportioned ~2:1 landscape banner found in the client's own asset pack,
+   D:\Download\蟬吃茶-素材盤點包\assets\image\375x185mm2.jpeg — already carries the
+   蟬吃茶 logo + tagline), and background-size:cover here keeps it aspect-safe for any
+   future source image regardless of shape. The matching JS change in zen-fixes.js
+   switches the scroll-zoom from background-size percentages to a CSS transform:scale
+   (see comment there), which composes safely with cover. overflow hidden clips the
+   scaled-up image to the hero box instead of spilling out of it. */
+.p-top-hero__image {
+  overflow: hidden;
+}
+
+.p-top-hero__item--main {
+  background-size: cover !important;
+  transform-origin: center center;
+  /* main--global.css's ".p-top-hero__image li:first-child{transition:opacity 2s
+     ease,transform 2s cubic-bezier(...)}" is a one-time entrance-fade rule for the
+     original hero, but it also catches every SUBSEQUENT transform change — including
+     zen-fixes.js's per-scroll-event updates. Confirmed via getComputedStyle: mid-
+     continuous-scroll, computed opacity/transform sat well behind the just-set inline
+     values (still ~0.96 opacity when the inline style already said 0), because each new
+     scroll event restarts a 2-3s easing toward a moving target. Instant updates read
+     correctly as "tied to scroll position"; a multi-second lag reads as broken/laggy. */
+  transition: none !important;
+}
+
+/* Hero left/right drink illustrations: the pristine Ippodo clone's hero is actually
+   FOUR stacked layers, not one — confirmed by opening mainvisual-front01/02 directly:
+   two large transparent PNGs, each with illustrated figures drawn only on one half
+   (front01 = people/dog/tree on the LEFT, rest fully transparent; front02 = mirror
+   composition on the RIGHT), layered on top of the back/main scene.
+
+   bundle.js's scroll handler animates these via background-size (100+scrollTop/3, vs
+   scrollTop/50 for --main — front zooms ~17x faster) on a background-image anchored at
+   the illustration's own edge. Because the box itself never moves, zooming a
+   background-size that's anchored at the outer edge makes the illustrated content grow
+   PAST that edge and out of the (overflow:hidden) hero box — it reads as "zoom bigger
+   while sliding off-screen toward the edge," not "zoom toward the center." A first pass
+   here used transform:scale from an edge transform-origin, which grows the box back
+   INTO the center instead (the opposite direction) and never fades, since bundle.js's
+   effect is a size-only illusion with no explicit opacity animation but visually reads
+   as "shrinks to nothing" once the zoomed content is entirely outside the clipped box.
+
+   zen-fixes.js now drives three properties together on scroll to sell the same "grows,
+   slides toward the edge, disappears" read with discrete <img> elements: scale up,
+   translateX AWAY from center (negative for left, positive for right), and opacity down
+   to 0 — capped at a fixed scroll distance so the layers are fully gone well before the
+   hero itself scrolls out of view. */
+.p-top-hero__item--front-left,
+.p-top-hero__item--front-right {
+  /* main--global.css's ".p-top-hero__image li{width:100%;height:100%}" (specificity
+     0,1,1) otherwise beats these on width/height (0,1,0) — it's sized for the original
+     single full-bleed hero layer, not an edge-anchored illustration cluster. */
+  position: absolute;
+  bottom: 0;
+  width: 42% !important;
+  height: 46% !important;
+  pointer-events: none;
+  transform-origin: center bottom;
+  /* Same nth-child(2)/(n+3) transition rule as --main above (2-3s opacity/transform
+     easing meant as a one-time entrance fade) — same lag problem, worse here since this
+     drives 3 properties per scroll event instead of 1. */
+  transition: none !important;
+}
+.p-top-hero__item--front-left {
+  left: 0;
+}
+.p-top-hero__item--front-right {
+  right: 0;
+}
+
+.p-top-hero__drink {
+  position: absolute;
+  bottom: 0;
+  display: block;
+  width: auto;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.18));
+}
+/* The 3 slots per side overlap horizontally no matter how much the offsets below are
+   widened — each drink photo's rendered width depends on its own aspect ratio (ginger
+   tea is a near-square 1104x1089 mug shot, so at the same programmed height it renders
+   ~1.7x wider than the tall glasses next to it) and there's no fixed spacing that clears
+   every combination. So z-index runs BACKWARDS from what "biggest = closest = front"
+   would suggest: the smallest/furthest slot (drink--3/--6) paints on TOP, not behind.
+   ginger tea (drink--5, only ~31% alpha-transparent — mostly an opaque rectangle,
+   not a clean cutout) fully covered the smallest slot when z-index instead followed
+   size, since that slot's whole footprint sat inside ginger's box; painting smaller
+   images on top guarantees all three stay visible regardless of overlap. */
+.p-top-hero__drink--1 {
+  left: 0;
+  height: 100%;
+  z-index: 1;
+}
+.p-top-hero__drink--2 {
+  left: 30%;
+  height: 76%;
+  z-index: 2;
+  opacity: 0.92;
+}
+.p-top-hero__drink--3 {
+  left: 58%;
+  height: 58%;
+  z-index: 3;
+  opacity: 0.82;
+}
+.p-top-hero__drink--4 {
+  right: 0;
+  height: 100%;
+  z-index: 1;
+}
+.p-top-hero__drink--5 {
+  right: 30%;
+  height: 76%;
+  z-index: 2;
+  opacity: 0.92;
+}
+.p-top-hero__drink--6 {
+  right: 58%;
+  height: 58%;
+  z-index: 3;
+  opacity: 0.82;
+}
+
+/* Ippodo's own mobile hero only ships ONE front layer (simpler composition on small
+   screens) — following that lead, drop both drink clusters on mobile rather than
+   cramming six extra images into a 70vh-tall mobile hero on top of the announcement
+   bar, nav, and headline text that already live there. */
+@media (max-width: 768px) {
+  .p-top-hero__item--front-left,
+  .p-top-hero__item--front-right {
+    display: none;
+  }
+}
+
+/* Shopping category quick-nav icons: confirmed against the pristine Ippodo clone that
+   .p-top-buy__image is a 90x90 SQUARE icon slot (source icons there are 180x180). Our
+   replacement images (350x200-*.jpg, natural ~1460x835 landscape banners) get squeezed
+   to width:90px with auto height, rendering as ~90x51 illegible slivers. Cropping to a
+   square via object-fit restores a real icon-shaped thumbnail regardless of source shape. */
+.p-top-buy__image {
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* .p-top-buy__nav's grid-template-columns (main--global.css) is hard-coded to 6 tracks
+   because Ippodo's real Shopping quick-nav has 9 categories that wrap across two rows.
+   Our replacement only has 4 categories (茶包/茶葉/茶具/禮盒). The grid container itself
+   is correctly centered (max-width:877px;margin:auto), but with 6 tracks and only 4
+   items, grid's default justify-content:start packs them into the left 4 columns and
+   leaves the rightmost 2 columns' worth of the (centered) box empty — reading as the
+   icon row being shifted left instead of centered. Confirmed via getBoundingClientRect:
+   left margin 302px vs right margin 580px. Fixed by matching the track count to our
+   actual item count so the 4 icons fill and center within the box themselves. */
+@media (min-width: 769px) {
+  .p-top-buy__nav {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+@media (max-width: 768px) {
+  .p-top-buy__nav {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* .o-card-nav__image img (關於蟬吃茶 / 茶品介紹 / 門市與活動 nav cards): unlike the
+   product-card images above, main--global.css gives .o-card-nav__image a percentage
+   width but never constrains the <img> inside it, so it renders at its natural size.
+   The three replacement source images are wildly different shapes — a 65x65 icon, a
+   1462x4376 portrait illustration, and a 2215x898 landscape photo — confirmed via
+   getBoundingClientRect: rendered heights of 65px / 742px / 101px for what should be
+   three equal-sized nav cards in a row. */
+.o-card-nav__image img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Announcement bar text (.announcement-bar__message.center) and the entire footer
+   column grid (.footer__blocks-wrapper.grid.grid--4-col-tablet) were both broken for
+   the same reason: index.html never linked assets/base.css — Shopify Dawn's foundation
+   stylesheet (.center{text-align:center}, .grid{display:flex...}, .page-width{max-
+   width:var(--page-width);margin:0 auto}, etc.). cleanup_scripts.py's Shopify-cleanup
+   pass dropped its <link> tag along with genuinely-dead cart/checkout CSS
+   (accelerated-checkout-backwards-compat.css, cart-app.css, ...) — base.css is pure
+   layout CSS with no cart/checkout dependencies and was safe to keep; removing it was
+   the actual root cause of most of the site's centering/alignment problems, not a
+   missing rule per element. Re-linked in index.html (loaded before main--global.css,
+   matching Shopify Dawn's real load order) instead of hand-duplicating its rules here. */
+
+
+/* ===== Round 3 fixes ===== */
+
+/* Announcement bar: use Ippodo's bg-announcement.png like the real site */
+.announcement-bar {
+  background-image: url(bg-announcement.png) !important;
+  background-repeat: repeat-x !important;
+  background-size: auto 100% !important;
+  background-color: #f5f0e8 !important;
+}
+
+/* Body background: warm beige to match Ippodo's site tone */
+body {
+  background-color: #faf8f5 !important;
+}
+
+/* Header icons: ensure they have explicit dimensions and show */
+.c-unav-pc .c-icon--search,
+.c-unav-sp .c-icon--search,
+.c-unav-sp-fix .c-icon--search {
+  width: 20px !important;
+  height: 20px !important;
+  display: inline-block !important;
+  background: url(icon-search.svg) center no-repeat !important;
+  background-size: contain !important;
+}
+.c-unav-pc .c-icon--shop,
+.c-unav-sp .c-icon--shop {
+  width: 20px !important;
+  height: 20px !important;
+  display: inline-block !important;
+  background: url(icon-shop.svg) center no-repeat !important;
+  background-size: contain !important;
+}
+
+/* Shopping section: force 4 columns, prevent wrapping */
+@media (min-width: 769px) {
+  .p-top-buy__nav {
+    grid-template-columns: repeat(4, 1fr) !important;
+    max-width: 877px !important;
+    margin: 0 auto !important;
+    gap: 20px !important;
+  }
+  .p-top-buy__item {
+    width: 100% !important;
+  }
+}
+
+/* Ensure all shopping category icons are uniform squares */
+.p-top-buy__image {
+  width: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  border-radius: 8px;
+}
+
+/* Feature slider: uniform square images */
+.o-feature-list__item img.a-image {
+  display: block !important;
+  width: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+/* Recipe slider: uniform 3:2 images */
+.p-top-recipe__item img.p-top-recipe__image,
+.p-top-recipe__item .p-top-recipe__image {
+  display: block !important;
+  width: 100% !important;
+  aspect-ratio: 3 / 2 !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+/* Story/Iroiro slider: uniform 3:2 images */
+.p-top-iroiro__item > a > img {
+  display: block !important;
+  width: 100% !important;
+  aspect-ratio: 3 / 2 !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+/* Product cards in highlight slider: already handled by main--global.css
+   padding-top:124% trick, but ensure images fill properly */
+.m-product-card__image img {
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+/* Nav cards (關於蟬吃茶 / 茶品介紹 / 門市與活動): uniform 4:5 portrait */
+.o-card-nav__image img {
+  display: block !important;
+  width: 100% !important;
+  aspect-ratio: 4 / 5 !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+/* Brand homophones section: uniform square icons */
+.zen-homophones img {
+  display: block !important;
+  width: 100% !important;
+  max-width: 140px !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  margin: 0 auto 12px !important;
+}
+
+/* Trust section cards: uniform height */
+#shopify-section-zen-trust .js-fadetarget {
+  min-height: 160px;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Fix mobile horizontal overflow on subpages - header elements */
+@media (max-width: 768px) {
+  body { overflow-x: hidden !important; }
+  .c-header__inner, .c-header-top, .c-unav-pc { max-width: 100% !important; overflow-x: hidden !important; }
+  .c-gnav-pc { display: none !important; }
+  .c-unav-pc { display: none !important; }
+  .page-width { max-width: 100% !important; padding: 0 15px !important; }
+  .p-sub-page, .p-product-detail { overflow-x: hidden !important; }
+  table { max-width: 100% !important; display: block !important; overflow-x: auto !important; }
+}
+
+/* PC nav dropdown thumbnails (關於蟬吃茶 / 茶品知識 / 蟬茶日誌 mega-menus): main--
+   global.css sets .c-img-nav--pc{width:150px;height:100%}. "height:100%" only resolves
+   against a definite-height ancestor; the containing <li>/<a> here has no set height,
+   so browsers fall back to the image's own natural aspect ratio for height instead —
+   each of the 6 dropdown thumbnails uses a differently-shaped source (a ~65x65 icon, a
+   2215x898 landscape banner, several ~800x800-ish product/article photos), so they
+   rendered at wildly different heights side by side (confirmed by screenshot: one near-
+   square icon next to a short landscape sliver next to a much taller photo). Forcing a
+   fixed aspect-ratio + object-fit:cover makes every thumbnail resolve to the same box
+   regardless of its source image's shape, matching the width:150/height:190 the HTML
+   attributes already specify (a ~0.79 ratio) but which the CSS never actually enforced. */
+.c-img-nav--pc {
+  height: auto !important;
+  aspect-ratio: 150 / 190 !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+/* 購物 (Shopping) dropdown's own thumbnail class has no height rule at all (pure
+   natural-aspect-ratio auto height) — our 4 source images are all similar-ish
+   landscape banners so this happened to look "close enough", but nothing actually
+   constrains it; same fix as .c-img-nav--pc above for consistency/robustness. */
+.c-img-nav-category {
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: cover !important;
+  object-position: center !important;
+}
+
+/* Fix remaining mobile overflow */
+@media (max-width: 768px) {
+  html, body { overflow-x: hidden !important; max-width: 100vw !important; }
+  * { max-width: 100% !important; }
+  .c-unav-pc, .c-gnav-pc { display: none !important; }
+  .c-header-top > ul:not(.c-unav-sp-fix) { display: none !important; }
+  .announcement-bar__message { font-size: 12px !important; padding: 8px 10px !important; }
+}

@@ -1,0 +1,167 @@
+/* style to Modal */
+#__bol-modal {
+  display: none;
+  position: fixed;
+  z-index: 100000;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  background-color: rgb(0, 0, 0);
+  background-color: rgba(0, 0, 0, 0.4);
+  -webkit-animation-name: bol-fadeIn;
+  -webkit-animation-duration: 0.4s;
+  animation-name: bol-fadeIn;
+  animation-duration: 0.4s;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+}
+
+#__bol-modal-content-wrap {
+  -webkit-animation-name: bol-slideIn;
+  -webkit-animation-duration: 0.4s;
+  animation-name: bol-slideIn;
+  animation-duration: 0.4s;
+  justify-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 10px;
+  gap: 20px;
+  isolation: isolate;
+  position: absolute;
+  width: 350px;
+  height: -webkit-fill-available;
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+}
+
+.__bol-modal-content {
+  position: absolute;
+  width: 100%;
+  height: auto;
+  background: #ffffff;
+  overflow-y: auto;
+}
+
+.__bol-modal-header {
+  padding: 2px 0 2px 16px;
+  color: white;
+}
+
+.__bol-modal-header h2 {
+  color: #121;
+  width: 330px;
+  height: 22px;
+  font-style: normal;
+  font-weight: bold;
+  font-size: 1.6rem;
+  line-height: 30px;
+  text-align: center;
+  margin-top: 20px;
+}
+
+#__bol-modal-body {
+  padding: 2px 16px;
+}
+
+#__bol-modal-body p {
+  margin-bottom: 5px !important;
+  color: #121;
+  width: 320px;
+  height: 30px;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 16px;
+  display: flex;
+  align-items: center;
+  text-align: center;
+}
+
+#__bol-modal-body ul {
+  width: 330px;
+  height: 26px;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 1.3rem;
+  line-height: 1.3rem;
+  color: #121212;
+  margin-top: 0;
+  margin-bottom: 0;
+  list-style: none;
+  padding: 5px 0;
+}
+
+.__bol-modal-footer {
+  color: white;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  padding: 15px 15px 10px 15px;
+}
+
+#__bol-modal-footer-confirm-btn {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  gap: 10px;
+  width: 330px;
+  height: 47px;
+  background: #000000;
+  flex-direction: row;
+  justify-content: center;
+  color: #ffffff;
+  letter-spacing: 0.04em;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 1.6rem;
+  line-height: 15px;
+  border: 2px solid black;
+}
+
+@-webkit-keyframes bol-slideIn {
+  from {
+    bottom: -300px;
+    opacity: 0;
+  }
+
+  to {
+    bottom: 100px;
+    opacity: 1;
+  }
+}
+
+@keyframes bol-slideIn {
+  from {
+    bottom: -300px;
+    opacity: 0;
+  }
+
+  to {
+    bottom: 100px;
+    opacity: 1;
+  }
+}
+
+@-webkit-keyframes bol-fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes bol-fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
